@@ -13,21 +13,34 @@ import imageio_ffmpeg
 # CREATE APP
 # ==========================================
 
-app = FastAPI()
+app = FastAPI(
+    title="YouTube Downloader API",
+    version="1.0.0"
+)
 
 
 # ==========================================
 # CORS
 # ==========================================
 
+# Local development + deployed frontend
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+
+# Add deployed frontend URL through environment variable
+frontend_url = os.getenv("FRONTEND_URL")
+
+if frontend_url:
+    ALLOWED_ORIGINS.append(frontend_url)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,13 +56,75 @@ class VideoRequest(BaseModel):
 
 
 # ==========================================
+# URL VALIDATION
+# ==========================================
+
+def validate_youtube_url(url: str):
+
+    if not url.startswith(
+        (
+            "https://www.youtube.com/",
+            "https://youtube.com/",
+            "https://youtu.be/",
+        )
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid YouTube URL."
+        )
+
+
+# ==========================================
+# YOUTUBE ERROR HANDLER
+# ==========================================
+
+def format_youtube_error(error):
+
+    message = str(error)
+
+    if (
+        "Sign in to confirm" in message
+        or "not a bot" in message
+    ):
+        return (
+            "YouTube is currently blocking requests from "
+            "the server. Please try another video later."
+        )
+
+    if "This video is not available" in message:
+        return "This YouTube video is not available."
+
+    if "Requested format is not available" in message:
+        return (
+            "The requested video format is not available. "
+            "Please try another video."
+        )
+
+    return message
+
+
+# ==========================================
 # HOME
 # ==========================================
 
 @app.get("/")
 def home():
+
     return {
-        "message": "YouTube Downloader API is running"
+        "message": "YouTube Downloader API is running",
+        "status": "online"
+    }
+
+
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "healthy"
     }
 
 
@@ -60,20 +135,12 @@ def home():
 @app.post("/api/info")
 def get_video_info(request: VideoRequest):
 
-    if not request.url.startswith(
-        (
-            "https://www.youtube.com/",
-            "https://youtu.be/",
-        )
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid YouTube URL"
-        )
+    validate_youtube_url(request.url)
 
     options = {
         "quiet": True,
         "noplaylist": True,
+        "no_warnings": True,
     }
 
     try:
@@ -98,7 +165,7 @@ def get_video_info(request: VideoRequest):
 
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=format_youtube_error(e)
         )
 
 
@@ -114,17 +181,9 @@ def download_video(request: VideoRequest):
     print("URL:", request.url)
     print("==============================")
 
-    if not request.url.startswith(
-        (
-            "https://www.youtube.com/",
-            "https://youtu.be/",
-        )
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid YouTube URL"
-        )
+    validate_youtube_url(request.url)
 
+    # Create downloads directory
     download_dir = "downloads"
 
     os.makedirs(
@@ -132,6 +191,7 @@ def download_video(request: VideoRequest):
         exist_ok=True
     )
 
+    # Unique filename
     file_id = str(uuid.uuid4())
 
     output_template = os.path.join(
@@ -139,25 +199,38 @@ def download_video(request: VideoRequest):
         f"{file_id}.%(ext)s"
     )
 
-    # Get FFmpeg supplied by imageio-ffmpeg
+    # ======================================
+    # FFmpeg
+    # ======================================
+
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
     print("FFmpeg:", ffmpeg_path)
 
+    # ======================================
+    # yt-dlp OPTIONS
+    # ======================================
+
     options = {
-        "format": "bestvideo+bestaudio/best",
+
+        # Prefer MP4 video + M4A audio.
+        # If unavailable, fall back to best available.
+        "format": (
+            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/"
+            "bestvideo+bestaudio/best"
+        ),
+
         "noplaylist": True,
 
-        "js_runtimes": {
-            "deno": {}
-        },
         "ffmpeg_location": ffmpeg_path,
 
         "merge_output_format": "mp4",
 
-        "outtmpl": "downloads/%(title)s.%(ext)s",
+        "outtmpl": output_template,
 
         "quiet": False,
+
+        "no_warnings": False,
     }
 
     try:
@@ -173,7 +246,12 @@ def download_video(request: VideoRequest):
 
             filename = ydl.prepare_filename(info)
 
-        # After merging, yt-dlp should create MP4
+        print("Initial filename:", filename)
+
+        # ==================================
+        # FIND FINAL MP4
+        # ==================================
+
         base_name = os.path.splitext(filename)[0]
 
         mp4_filename = base_name + ".mp4"
@@ -182,14 +260,43 @@ def download_video(request: VideoRequest):
 
             filename = mp4_filename
 
-        elif not os.path.exists(filename):
+        elif os.path.exists(filename):
 
-            raise Exception(
-                f"Downloaded file not found: {filename}"
-            )
+            # File already exists
+            pass
+
+        else:
+
+            # Search for file using UUID
+            possible_files = []
+
+            for file in os.listdir(download_dir):
+
+                if file.startswith(file_id):
+
+                    possible_files.append(
+                        os.path.join(
+                            download_dir,
+                            file
+                        )
+                    )
+
+            if possible_files:
+
+                filename = possible_files[0]
+
+            else:
+
+                raise Exception(
+                    "Downloaded file was not found."
+                )
 
         print("DOWNLOAD SUCCESS")
         print("File:", filename)
+
+        # ==================================
+        # RETURN FILE
+        # ==================================
 
         return FileResponse(
             filename,
@@ -199,13 +306,9 @@ def download_video(request: VideoRequest):
 
     except Exception as e:
 
-        print("\n==============================")
-        print("ACTUAL DOWNLOAD ERROR")
-        print(type(e).__name__)
-        print(str(e))
-        print("==============================\n")
+        print("DOWNLOAD ERROR:", e)
 
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=format_youtube_error(e)
         )
