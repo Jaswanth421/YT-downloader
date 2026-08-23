@@ -1,0 +1,106 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #111;
+  color: white;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  width: 90%;
+  max-width: 800px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #aaa;
+  margin-bottom: 35px;
+}
+
+.download-box {
+  display: flex;
+  gap: 10px;
+}
+
+.download-box input {
+  flex: 1;
+  padding: 16px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background: #222;
+  color: white;
+  font-size: 16px;
+}
+
+.download-box button {
+  padding: 16px 25px;
+  border: none;
+  border-radius: 8px;
+  background: #ff4d4d;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.download-box button:hover {
+  background: #e63939;
+}
+.video-card {
+  margin-top: 30px;
+  padding: 20px;
+  background: #222;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.video-card img {
+  width: 100%;
+  max-width: 500px;
+  border-radius: 8px;
+}
+
+.video-info {
+  margin-top: 15px;
+}
+
+.video-info h2 {
+  margin-bottom: 10px;
+}
+
+.video-info p {
+  color: #aaa;
+}
+
+.error {
+  margin-top: 20px;
+  color: #ff6b6b;
+}
+.download-button {
+  margin-top: 20px;
+  padding: 14px 30px;
+  border: none;
+  border-radius: 8px;
+  background: #ff4d4d;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.download-button:hover {
+  background: #e63939;
+}

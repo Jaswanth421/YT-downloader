@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.local
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# React build
+frontend/dist/
+
+# Downloads
+downloads/
+*.mp4
+*.webm
+*.mkv
+
+# IDE
+.vscode/
