@@ -7,6 +7,7 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const API_URL = "https://yt-downloader-sxb5.onrender.com";
 
   // Get video information
   const handleSubmit = async () => {
@@ -20,9 +21,7 @@ function App() {
     setVideo(null);
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/info",
-        {
+      const response = await fetch(`${API_URL}/api/info`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -61,9 +60,7 @@ function App() {
     setError("");
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/download",
-        {
+      const response = await fetch(`${API_URL}/api/download`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
